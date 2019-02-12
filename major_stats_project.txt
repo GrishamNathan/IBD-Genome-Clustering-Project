@@ -1,0 +1,48 @@
+##Inflammatory Bowel Disease Project
+
+library(mclust)
+library(tidyverse)
+library(readxl)
+
+#read and clean the data into R
+bowel.data <- read_excel("FinalProject-inflammatory_bowel_disease.xlsx")
+bowel.matrix <- as.matrix(bowel.data)
+bowel.matrix <- t(bowel.matrix)
+ProbeSet.ID <- bowel.matrix["Probe.Set.ID",]
+Variables <- bowel.matrix["Other Variables",]
+bowel.matrix <- bowel.matrix[c(-1,-2),]
+col.headers <- c(Variables[1:4], ProbeSet.ID[-1:-4])
+colnames(bowel.matrix) <- col.headers
+bowel.data.mod = data.frame(bowel.matrix)
+bowel.data.mod$Group <- as.character(bowel.data.mod$Group)
+bowel.data.mod$Group[bowel.data.mod$Group == "Ulcerative"] = "Ulcerative Colitis"
+bowel.data.mod$Group <- as.factor(bowel.data.mod$Group)
+bowel.data.mod$Ethnicity <- as.character(bowel.data.mod$Ethnicity)
+bowel.data.mod$Ethnicity[bowel.data.mod$Ethnicity == "cacuasian"] = "caucasian"
+bowel.data.mod$Ethnicity <- as.factor(bowel.data.mod$Ethnicity)
+
+
+#Exploring the data
+bowel.data.mod %>% group_by(Group) %>% summarize(n=n())
+
+bowel.num = bowel.data.mod[,c(-1,-2,-3,-4)]
+indx <- sapply(bowel.num, is.factor)
+bowel.num[indx] <- lapply(bowel.num[indx], function(x) as.numeric(as.character(x)))
+
+bowel.cor = cor(bowel.num)
+nosig <- bowel.cor < 0.5
+bowel.eigen = eigen(bowel.cor)
+
+#Implementing Principal Component Analysis
+bowel.pca =  prcomp(bowel.num, scale=TRUE)
+bowel.pca
+plot(bowel.pca, type = "l")
+summary(bowel.pca)
+
+#Implementing Gaussian Mixture Model
+bowel.reduced = as.matrix(bowel.num)%*%bowel.eigen$vectors[,1:38]
+gmm = Mclust(bowel.reduced, 3)
+table(gmm$classification)
+classification.table <- as.matrix(gmm$classification)
+groupings <- merge(classification.table, bowel.data.mod, by=0)
+groupings %>% group_by(groupings$Group, groupings$V1) %>% summarize(n=n())
